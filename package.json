@@ -1,7 +1,17 @@
 {
-  "type": "module",
+  "name": "simple-api",
+  "version": "1.0.0",
+  "description": "",
+  "main": "api/index.js",
+  "scripts": {
+    "start": "node api/index.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
   "dependencies": {
-    "puppeteer-core": "^19.11.1",
-    "chrome-aws-lambda": "^10.1.0"
+    "axios": "^1.6.0",
+    "cheerio": "^1.0.0-rc.12",
+    "express": "^4.18.2"
   }
 }
