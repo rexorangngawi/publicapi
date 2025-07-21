@@ -1,4 +1,5 @@
-import puppeteer from 'puppeteer';
+import chromium from 'chrome-aws-lambda';
+import puppeteer from 'puppeteer-core';
 import https from 'https';
 
 export default async function handler(req, res) {
@@ -13,23 +14,22 @@ export default async function handler(req, res) {
 
   try {
     const browser = await puppeteer.launch({
-  headless: true,
-  args: ['--no-sandbox', '--disable-setuid-sandbox']
-});
+      args: chromium.args,
+      defaultViewport: chromium.defaultViewport,
+      executablePath: await chromium.executablePath,
+      headless: chromium.headless
+    });
+
     const page = await browser.newPage();
     await page.goto('https://dlpanda.com', { waitUntil: 'networkidle2' });
 
-    // Input URL dan submit
     await page.type('#url', tiktokUrl);
     await page.click('#submit');
-
-    // Tunggu sampai link download muncul
     await page.waitForSelector('.download-links a', { timeout: 15000 });
 
     const videoUrl = await page.$eval('.download-links a', a => a.href);
     await browser.close();
 
-    // Download file & convert ke base64
     https.get(videoUrl, response => {
       let data = [];
       response.on('data', chunk => data.push(chunk));
@@ -42,7 +42,7 @@ export default async function handler(req, res) {
         res.status(200).json({
           success: true,
           base64: dataUri,
-          size: buffer.length,
+          size: buffer.length
         });
       });
     }).on('error', e => {
