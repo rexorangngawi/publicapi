@@ -12,7 +12,10 @@ export default async function handler(req, res) {
   }
 
   try {
-    const browser = await puppeteer.launch({ headless: 'new', args: ['--no-sandbox'] });
+    const browser = await puppeteer.launch({
+  headless: true,
+  args: ['--no-sandbox', '--disable-setuid-sandbox']
+});
     const page = await browser.newPage();
     await page.goto('https://dlpanda.com', { waitUntil: 'networkidle2' });
 
