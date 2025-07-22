@@ -1,0 +1,28 @@
+{
+  "name": "image-enhancement-api",
+  "version": "1.0.0",
+  "description": "API for enhancing images using Google Gemini with a default prompt.",
+  "main": "api/index.js",
+  "scripts": {
+    "start": "node api/index.js",
+    "dev": "NODE_ENV=development node api/index.js"
+  },
+  "keywords": [
+    "vercel",
+    "nodejs",
+    "express",
+    "gemini",
+    "image-generation",
+    "api"
+  ],
+  "author": "Your Name/Organization",
+  "license": "MIT",
+  "dependencies": {
+    "@google/generative-ai": "^0.15.0",
+    "axios": "^1.7.2",
+    "express": "^4.19.2"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.4"
+  }
+}
