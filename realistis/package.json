@@ -1,7 +1,7 @@
 {
   "name": "image-enhancement-api",
   "version": "1.0.0",
-  "description": "API for enhancing images using Google Gemini with a default prompt.",
+  "description": "New Api",
   "main": "api/index.js",
   "scripts": {
     "start": "node api/index.js",
@@ -15,7 +15,7 @@
     "image-generation",
     "api"
   ],
-  "author": "Your Name/Organization",
+  "author": "Unknown",
   "license": "MIT",
   "dependencies": {
     "@google/generative-ai": "^0.15.0",
