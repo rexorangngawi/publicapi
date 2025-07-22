@@ -17,6 +17,6 @@
     }
   ],
   "env": {
-    "GEMINI_API_KEY": "@gemini_api_key"
+    "GEMINI_API_KEY": "AIzaSyBhtH7yKgjs6NigbeTRXoPxUyv2bE2yPug"
   }
 }
