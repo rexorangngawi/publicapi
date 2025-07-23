@@ -1,57 +1,61 @@
-// Vercel Function API (Node.js)
-import { writeFile, unlink } from 'fs/promises';
+// api/tiktok.js
+import { load } from 'cheerio';
 import fetch from 'node-fetch';
-import * as cheerio from 'cheerio';
 
-export default async function handler(req, res) {
-  if (req.method !== 'POST') {
-    return res.status(405).json({ error: 'Only POST method allowed' });
-  }
+export const config = {
+  runtime: 'edge',
+};
 
-  const { url } = req.body;
-  if (!url || !url.includes('tiktok.com')) {
-    return res.status(400).json({ error: 'Invalid TikTok URL' });
-  }
-
+export default async function handler(req) {
   try {
-    // Step 1: Request to Musicaldown landing page
-    const base = 'https://musicaldown.com';
-    const headers = {
-      'Content-Type': 'application/x-www-form-urlencoded',
-      'User-Agent': 'Mozilla/5.0',
-    };
+    const { url } = await req.json();
 
-    // Step 2: POST video URL to get download form
-    const formData = new URLSearchParams();
-    formData.append('url', url);
-    formData.append('submit', '');
-
-    const r1 = await fetch(`${base}/`, {
-      method: 'POST',
-      headers,
-      body: formData,
-    });
-
-    const html = await r1.text();
-    const $ = cheerio.load(html);
-    const downloadLink = $('a[href*="/download/"]').first().attr('href');
-
-    if (!downloadLink) {
-      return res.status(500).json({ error: 'Failed to fetch download link' });
+    if (!url) {
+      return new Response(JSON.stringify({ error: 'No URL provided' }), { status: 400 });
     }
 
-    // Step 3: Download the video
-    const videoResp = await fetch(downloadLink);
-    const buffer = await videoResp.arrayBuffer();
-    const base64 = Buffer.from(buffer).toString('base64');
+    // Resolve TikTok shortlink
+    const response = await fetch(url, { redirect: 'follow' });
+    const finalUrl = response.url;
 
-    // Optional: Use Data URI prefix
-    const mime = 'video/mp4';
-    const dataUri = `data:${mime};base64,${base64}`;
+    // Fetch musicaldown.com
+    const home = await fetch('https://musicaldown.com', {
+      headers: {
+        'User-Agent': 'Mozilla/5.0',
+      },
+    });
+    const homeHtml = await home.text();
+    const $ = load(homeHtml);
+    const token = $('input[name="token"]').val();
 
-    return res.status(200).json({ base64: dataUri });
-  } catch (err) {
-    console.error(err);
-    return res.status(500).json({ error: 'Something went wrong' });
+    // Submit form
+    const form = await fetch('https://musicaldown.com/download', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+        'User-Agent': 'Mozilla/5.0',
+      },
+      body: new URLSearchParams({
+        url: finalUrl,
+        token,
+      }),
+    });
+
+    const formHtml = await form.text();
+    const $$ = load(formHtml);
+    const downloadLink = $$('a[href^="https://cdn"]').attr('href');
+
+    if (!downloadLink) {
+      return new Response(JSON.stringify({ error: 'Failed to fetch download link' }), { status: 500 });
+    }
+
+    return new Response(JSON.stringify({ url: downloadLink }), {
+      headers: { 'Content-Type': 'application/json' },
+    });
+  } catch (e) {
+    return new Response(JSON.stringify({ error: e.message }), {
+      status: 500,
+      headers: { 'Content-Type': 'application/json' },
+    });
   }
-      }
+}
