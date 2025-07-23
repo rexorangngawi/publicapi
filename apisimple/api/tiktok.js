@@ -1,7 +1,7 @@
 // Vercel Function API (Node.js)
 import { writeFile, unlink } from 'fs/promises';
 import fetch from 'node-fetch';
-import cheerio from 'cheerio';
+import * as cheerio from 'cheerio';
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
