@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="utf-8"/>
+<title>TinyRPG 3D Universal</title>
+<meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no"/>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{overflow:hidden;font-family:Arial,Helvetica,sans-serif;background:#000;color:#fff}
+canvas{display:block}
+#hud{position:absolute;top:5px;left:5px;font-size:clamp(12px,2.5vw,18px);background:rgba(0,0,0,.6);padding:4px 8px;border-radius:4px;z-index:10}
+#stickWrap{position:absolute;bottom:10px;left:10px;width:clamp(90px,20vw,130px);height:clamp(90px,20vw,130px);border:2px solid #fff;border-radius:50%;touch-action:none;display:none}
+#stick{position:absolute;top:50%;left:50%;width:30%;height:30%;background:#fff;border-radius:50%;transform:translate(-50%,-50%)}
+#btnWrap{position:absolute;bottom:10px;right:10px;display:none;gap:6px}
+.btn{width:clamp(50px,12vw,70px);height:clamp(50px,12vw,70px);border-radius:50%;border:none;background:#fff6;font-size:clamp(16px,3vw,24px)}
+@media (max-width: 768px){#stickWrap,#btnWrap{display:flex}}
+</style>
+</head>
+<body>
+<div id="hud">HP: 10/10 | COIN: 0 | LVL: 1</div>
+<canvas id="c"></canvas>
+
+<!-- Kontrol sentuh HP -->
+<div id="stickWrap"><div id="stick"></div></div>
+<div id="btnWrap"><button class="btn" id="atk">⚔️</button></div>
+
+<script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js"></script>
+<script>
+// === PARAMETER RESPONSIF ===
+const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+const FOV = isMobile ? 60 : 75; // lebih kecil di HP supaya tidak fish-eye
+const renderer = new THREE.WebGLRenderer({canvas: c, antialias: true});
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x87ceeb);
+const camera = new THREE.PerspectiveCamera(FOV, innerWidth/innerHeight, .1, 100);
+camera.position.set(1, .8, 1);
+
+// === LIGHT ===
+scene.add(new THREE.AmbientLight(0xffffff, .7));
+const dirLight = new THREE.DirectionalLight(0xffffff, .8);
+dirLight.position.set(5, 10, 7);
+scene.add(dirLight);
+
+// === MAP & MONSTER (sama seperti sebelumnya, dipersingkat) ===
+const MAP_W = 12, MAP_H = 12, CELL = 2;
+const map = Array.from({length: MAP_H}, ()=>Array(MAP_W).fill(0));
+for (let i=0;i<MAP_W;i++){ map[0][i]=1; map[MAP_H-1][i]=1; }
+for (let i=0;i<MAP_H;i++){ map[i][0]=1; map[i][MAP_W-1]=1; }
+for (let k=0;k<25;k++){const x=1+~~(Math.random()*(MAP_W-2)),y=1+~~(Math.random()*(MAP_H-2));map[y][x]=1;}
+map[MAP_H-2][MAP_W-2]=4; // exit
+const MONSTERS = [
+  {name:'Slime',hp:3,atk:1,color:0x00ff00,size:.4},
+  {name:'Bat',hp:2,atk:1,color:0x444,size:.3},
+  {name:'Goblin',hp:5,atk:2,color:0x228b22,size:.5},
+  {name:'Skeleton',hp:4,atk:2,color:0xdcdcdc,size:.55},
+  {name:'Spider',hp:3,atk:2,color:0x8b4513,size:.35},
+  {name:'Orc',hp:7,atk:3,color:0x556b2f,size:.6},
+  {name:'Wolf',hp:6,atk:3,color:0x696969,size:.5},
+  {name:'Mummy',hp:8,atk:3,color:0xffdead,size:.55},
+  {name:'Ghost',hp:5,atk:4,color:0x9370db,size:.45},
+  {name:'MiniBoss',hp:15,atk:5,color:0x8b0000,size:.7}
+];
+const monsters=[],coins=[];
+// walls
+const wallGeo=new THREE.BoxGeometry(CELL,CELL,CELL);
+const wallMat=new THREE.MeshStandardMaterial({color:0x8b4513});
+for(let y=0;y<MAP_H;y++)for(let x=0;x<MAP_W;x++){
+  if(map[y][x]===1){const w=new THREE.Mesh(wallGeo,wallMat);w.position.set(x*CELL,CELL/2,y*CELL);scene.add(w);}
+}
+// spawn monster
+for(let i=0;i<10;i++){
+  let x,y;do{x=1+~~(Math.random()*(MAP_W-2));y=1+~~(Math.random()*(MAP_H-2))}while(map[y][x]!==0);
+  const m=MONSTERS[i%MONSTERS.length];
+  const geo=new THREE.SphereGeometry(m.size,12,8);
+  const mat=new THREE.MeshStandardMaterial({color:m.color});
+  const mesh=new THREE.Mesh(geo,mat);
+  mesh.position.set(x*CELL,m.size,y*CELL);
+  mesh.userData={...m,x,y};
+  scene.add(mesh);monsters.push(mesh);map[y][x]=2;
+}
+// spawn coin
+for(let i=0;i<7;i++){
+  let x,y;do{x=1+~~(Math.random()*(MAP_W-2));y=1+~~(Math.random()*(MAP_H-2))}while(map[y][x]!==0);
+  const geo=new THREE.CylinderGeometry(.3,.3,.05,12);
+  const mat=new THREE.MeshStandardMaterial({color:0xffd700});
+  const mesh=new THREE.Mesh(geo,mat);
+  mesh.position.set(x*CELL,.3,y*CELL);mesh.rotation.x=Math.PI/2;
+  scene.add(mesh);coins.push(mesh);map[y][x]=3;
+}
+// exit
+const exitGeo=new THREE.BoxGeometry(CELL,CELL,CELL);
+const exitMat=new THREE.MeshStandardMaterial({color:0x8b008b});
+const exitDoor=new THREE.Mesh(exitGeo,exitMat);
+exitDoor.position.set((MAP_W-2)*CELL,CELL/2,(MAP_H-2)*CELL);
+scene.add(exitDoor);
+
+// === PLAYER ===
+let hp=10,maxHp=10,atk=3,coinCount=0,level=1;
+function updateHUD(){hud.innerText=`HP: ${hp}/${maxHp} | COIN: ${coinCount} | LVL: ${level}`;}
+updateHUD();
+
+// === JOYSTICK RESPONSIF ===
+const stickWrap=document.getElementById('stickWrap');
+const stick=document.getElementById('stick');
+let joyX=0,joyY=0,joyDown=false;
+function joyStart(e){joyDown=true;moveStick(e);}
+function joyMove(e){if(!joyDown)return;moveStick(e);}
+function moveStick(e){
+  const rect=stickWrap.getBoundingClientRect();
+  const x=(e.touches?e.touches[0].clientX:e.clientX)-rect.left-rect.width/2;
+  const y=(e.touches?e.touches[0].clientY:e.clientY)-rect.top-rect.height/2;
+  const len=Math.sqrt(x*x+y*y),max=rect.width/2-15;
+  if(len<=max){stick.style.transform=`translate(${x}px,${y}px)`;joyX=x/max;joyY=y/max;}
+  else{stick.style.transform=`translate(${x/len*max}px,${y/len*max}px)`;joyX=x/len;joyY=y/len;}
+}
+function joyEnd(){joyDown=false;stick.style.transform='translate(0,0)';joyX=0;joyY=0;}
+['mousedown','touchstart'].forEach(ev=>stickWrap.addEventListener(ev,joyStart));
+['mousemove','touchmove'].forEach(ev=>window.addEventListener(ev,joyMove));
+['mouseup','touchend'].forEach(ev=>window.addEventListener(ev,joyEnd));
+
+// === KEYBOARD BACKUP (PC) ===
+const keys={};
+onkeydown=e=>keys[e.key.toLowerCase()]=true;
+onkeyup=e=>keys[e.key.toLowerCase()]=false;
+
+// === MAIN LOOP ===
+const clock=new THREE.Clock();
+function animate(){
+  requestAnimationFrame(animate);
+  const delta=clock.getDelta();
+
+  // movement
+  if(isMobile){
+    // joystick
+    camera.translateX(joyX*delta*3);
+    camera.translateZ(-joyY*delta*3);
+  }else{
+    // WASD
+    const dir=new THREE.Vector3();
+    if(keys['w'])dir.z-=1;
+    if(keys['s'])dir.z+=1;
+    if(keys['a'])dir.x-=1;
+    if(keys['d'])dir.x+=1;
+    dir.normalize().multiplyScalar(delta*4);
+    camera.position.add(dir);
+  }
+  camera.position.x=Math.max(1,Math.min((MAP_W-2)*CELL-1,camera.position.x));
+  camera.position.z=Math.max(1,Math.min((MAP_H-2)*CELL-1,camera.position.z));
+
+  // coin pickup
+  coins.forEach((c,i)=>{
+    if(c.position.distanceTo(camera.position)<1){
+      scene.remove(c);coins.splice(i,1);
+      coinCount++;
+      if(coinCount%5===0){level++;maxHp+=3;atk+=1;hp=maxHp;}
+      updateHUD();
+    }
+  });
+
+  // monster attack
+  monsters.forEach(m=>{
+    if(m.position.distanceTo(camera.position)<1){
+      hp-=m.userData.atk;
+      updateHUD();
+      if(hp<=0){alert('Game Over');location.reload();}
+    }
+  });
+
+  // exit
+  if(exitDoor.position.distanceTo(camera.position)<1.5){
+    alert('You Win!');location.reload();
+  }
+
+  renderer.render(scene,camera);
+}
+animate();
+
+// attack button
+document.getElementById('atk').addEventListener('click',()=>{
+  monsters.forEach((m,i)=>{
+    if(m.position.distanceTo(camera.position)<1.5){
+      m.userData.hp-=atk;
+      if(m.userData.hp<=0){scene.remove(m);monsters.splice(i,1);}
+    }
+  });
+});
+
+// resize
+window.addEventListener('resize',()=>{
+  camera.aspect=innerWidth/innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth,innerHeight);
+});
+> >
+</body>
+  </html>
